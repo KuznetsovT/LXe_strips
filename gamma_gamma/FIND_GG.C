@@ -2,6 +2,7 @@
 #include <fstream>
 #include <map>
 #include <sstream>
+#include <utility>
 
 #include "TTree.h"
 #include "TFile.h"
@@ -34,7 +35,7 @@ int FIND_GG(int ebeam)
     auto runnum = tr_ph->GetV2();
     
     std::ofstream out(Form("scan2013_rho_tr_ph_fc_e%d_v8.txt", ebeam) );
-    std::map<int, std::string> selected;
+    std::map<int, std::pair<std::string, int>> selected;
     std::stringstream sout;
     
     
@@ -43,21 +44,21 @@ int FIND_GG(int ebeam)
     for(int i=0; i<selnum; i++, counter++, total_counter++) {
         if (i==0)
         {
-             sout << " -m \"";
+             sout << '\"';
              out << runnum[i] << "    :   \"";
              sout << evnum[i];  out << evnum[i];
              continue;
         }   
         if (runnum[i] != runnum[i-1]) {
                  out << "\"     -n     " << counter << "\n\n\n";
-                 sout << "\" -n " << counter;          
+                 sout << '\"';   // -n " << counter;          
                     
-                 selected[runnum[i-1]] = sout.str();
+                 selected[runnum[i-1]] = std::make_pair(sout.str(), counter);
                  if (total_counter > 1000) goto terminate;
 
                  counter = 0;
                  sout.str(std::string());
-                 sout << " -m \"";
+                 sout << '\"';
                  out << runnum[i] <<  "   :   \"";
                  sout << evnum[i]; out << evnum[i];
         } else { 
@@ -67,21 +68,21 @@ int FIND_GG(int ebeam)
     }
         
     out << "\"     -n     " << counter << "\n\n\n";
-    sout << "\" -n " << counter;
+    sout << '\"';   // -n " << counter;
         
-    selected[runnum[selnum-1]] = sout.str();
+    selected[runnum[selnum-1]] = std::make_pair(sout.str(), counter);
 
 terminate:
 
     out.close();
     
     /*for(auto const &item : selected) {
-           std::cout << item.first << ":    " << item.second << std::endl;
+           std::cout << item.first << ":    " << item.second.second << std::endl;
     }*/
     std::cout << "\ntotal: " <<  total_counter << "\n\n";
 
     TPython::LoadMacro("raw2tree.py");
-    TPython::Exec(Form("main(%d, \'%s\')", selected.begin()->first, selected.begin()->second.c_str()));
+    TPython::Exec(Form("main(%d, %s, %d)", selected.begin()->first, selected.begin()->second.first.c_str(), selected.begin()->second.second));
 
     return 0;
 }

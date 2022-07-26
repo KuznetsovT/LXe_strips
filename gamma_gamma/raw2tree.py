@@ -14,16 +14,9 @@ import subprocess as sp
 import time
 
 
-def fwk(fname, eventsstr):
+def fwk(fname, eventsstr, total):
     # sp.call(['cmd3fwk_xr', '-i', '"%s"' % fname, 'fwkcfg_online.opts'])
-    cmd = ['cmd3fwk_xr', '-i', fname, eventsstr, 'jobopts/fwkcfg_online.opts']
-    n = False
-    for ia, a in enumerate( sys.argv ):
-        if a == '-n':
-            n = int( sys.argv[ ia + 1 ] )
-    if n:
-        cmd.append( '-n' )
-        cmd.append( str( n ) )
+    cmd = ['cmd3fwk_xr', '-i', fname, '-m',  eventsstr, '-n', str(total),  'jobopts/fwkcfg_online.opts']
     print '*'*80
     print '*'*80
     print ' '.join(cmd)
@@ -34,7 +27,7 @@ def fwk(fname, eventsstr):
     sp.call( cmd )
 
 
-def doit(fname, eventsstr):
+def doit(fname):
     fnam = fname.split('/')[-1].split('.bz2')[0]+'.root'
     print fnam
     # print ' '.join(['root', '-b', '-q', """'doit.C("%s")'""" % fnam])
@@ -51,7 +44,7 @@ def doit(fname, eventsstr):
 
 def getFile(run):
     print run
-    out = sp.check_output(['lfc-ls', '-r', r'%raw%'+str(run)+r'%'])
+    out = sp.check_output(['lfc-ls', '-r', r'%raw.v1.'+str(run)+r'%'])
     out = out.split('\n')[2]
     print out
     if 'cmd' in out and 'online' in out:
@@ -140,12 +133,12 @@ def usage():
 
 
 
-def main( runnum, eventsstr ):
+def main( runnum, eventsstr, total ):
     b, fil = getFile( runnum )
     #for fil in files:
     t0 = time.time()
     print '\33[1m\33[33mLocal time :', time.localtime( t0 ), '\33[0m'
-    fwk( fil, eventsstr )
+    fwk( fil, eventsstr, total )
     print '\33[1m\33[33mFWK time :', time.time()-t0, 'seconds\33[0m'
     t1 = time.time()
     print '\33[1m\33[33mLocal time :', time.localtime( t1 ), '\33[0m'
