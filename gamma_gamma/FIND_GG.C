@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
-
+#include <map>
+#include <sstream>
 
 #include "TTree.h"
 #include "TFile.h"
@@ -11,10 +12,10 @@ using namespace TMath;
 
 
 
-int FIND_GG()
+int FIND_GG(int ebeam)
 {
     auto tr_ph = new TChain( "tr_ph" );
-    tr_ph->Add( "root://cmd//scan2019/scan2019_tr_ph_fc_e887.5_v8.root" );
+    tr_ph->Add( Form("root://cmd//scan2013_rho/scan2013_rho_tr_ph_fc_e%d_v8.root", ebeam) );
     
     std::cout << "BEGIN?\n";
     
@@ -31,34 +32,59 @@ int FIND_GG()
     auto selnum = tr_ph->GetSelectedRows();
     auto evnum = tr_ph->GetV1();
     auto runnum = tr_ph->GetV2();
-
-    std::cout << selnum << std::endl;
-    std::cout << "ARRS\n";
-
-    std::ofstream out("scan2019_tr_ph_fc_e887.5_v8.txt");
     
-    std::cout << "OPEN\n";
-
-    long counter = 0;
-    for(int i=0; i<selnum; i++, counter++) {
-        if (i==0) 
+    std::ofstream out(Form("scan2013_rho_tr_ph_fc_e%d_v8.txt", ebeam) );
+    std::map<int, std::string> selected;
+    std::stringstream sout;
+    
+    
+    int total_counter = 0;
+    int counter = 0;
+    for(int i=0; i<selnum; i++, counter++, total_counter++) {
+        if (i==0)
         {
-            out << runnum[i] << "    :   \"";
-            out << evnum[i];
-            continue;
-        }
+             sout << " -m \"";
+             out << runnum[i] << "    :   \"";
+             sout << evnum[i];  out << evnum[i];
+             continue;
+        }   
         if (runnum[i] != runnum[i-1]) {
-            out << "\"     -n     " << counter << "\n\n\n";
-            counter = 0;
-            out << runnum[i] <<  "   :   \"";
-            out << evnum[i];
-        } else {
-            out <<  ';' <<  evnum[i];
+                 out << "\"     -n     " << counter << "\n\n\n";
+                 sout << "\" -n " << counter;          
+                    
+                 selected[runnum[i-1]] = sout.str();
+                 if (total_counter > 1000) goto terminate;
+
+                 counter = 0;
+                 sout.str(std::string());
+                 sout << " -m \"";
+                 out << runnum[i] <<  "   :   \"";
+                 sout << evnum[i]; out << evnum[i];
+        } else { 
+                 out <<  ';' <<  evnum[i]; 
+                 sout <<  ';' <<  evnum[i]; 
         }
     }
+        
     out << "\"     -n     " << counter << "\n\n\n";
-    out.close();
+    sout << "\" -n " << counter;
+        
+    selected[runnum[selnum-1]] = sout.str();
 
-    std::cout << "END\n";
+terminate:
+
+    out.close();
+    
+    /*for(auto const &item : selected) {
+           std::cout << item.first << ":    " << item.second << std::endl;
+    }*/
+    std::cout << "\ntotal: " <<  total_counter << "\n\n";
+
+    TPython::LoadMacro("raw2tree.py");
+    TPython::Exec(Form("main(%d, \'%s\')", selected.begin()->first, selected.begin()->second.c_str()));
+
     return 0;
 }
+
+
+
