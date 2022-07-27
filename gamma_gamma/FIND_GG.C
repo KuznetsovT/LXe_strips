@@ -1,6 +1,6 @@
 #include <iostream>
 #include <fstream>
-#include <map>
+#include <vector>
 #include <sstream>
 #include <utility>
 
@@ -15,6 +15,9 @@ using namespace TMath;
 
 int FIND_GG(int ebeam)
 {
+    gSystem->Exec(Form("mkdir e%d", ebeam));
+    gSystem->Exec(Form("rm -f e%d/*",ebeam)); 
+    
     auto tr_ph = new TChain( "tr_ph" );
     tr_ph->Add( Form("root://cmd//scan2013_rho/scan2013_rho_tr_ph_fc_e%d_v8.root", ebeam) );
     
@@ -35,13 +38,12 @@ int FIND_GG(int ebeam)
     auto runnum = tr_ph->GetV2();
     
     std::ofstream out(Form("scan2013_rho_tr_ph_fc_e%d_v8.txt", ebeam) );
-    std::map<int, std::pair<std::string, int>> selected;
+    std::vector<std::pair<int, std::pair<std::string, int> > > selected;
     std::stringstream sout;
     
     
-    int total_counter = 0;
     int counter = 0;
-    for(int i=0; i<selnum; i++, counter++, total_counter++) {
+    for(int i=0; i<selnum; i++, counter++) {
         if (i==0)
         {
              sout << '\"';
@@ -53,9 +55,8 @@ int FIND_GG(int ebeam)
                  out << "\"     -n     " << counter << "\n\n\n";
                  sout << '\"';   // -n " << counter;          
                     
-                 selected[runnum[i-1]] = std::make_pair(sout.str(), counter);
-                 if (total_counter > 1000) goto terminate;
-
+                 selected.push_back(std::make_pair(runnum[i-1], std::make_pair(sout.str(), counter)));
+                 
                  counter = 0;
                  sout.str(std::string());
                  sout << '\"';
@@ -70,20 +71,34 @@ int FIND_GG(int ebeam)
     out << "\"     -n     " << counter << "\n\n\n";
     sout << '\"';   // -n " << counter;
         
-    selected[runnum[selnum-1]] = std::make_pair(sout.str(), counter);
-
-terminate:
+    selected.push_back(std::make_pair(runnum[selnum-1], std::make_pair(sout.str(), counter)));
 
     out.close();
+
+
+    std::sort(selected.begin(), selected.end(), [](const std::pair<int, std::pair<std::string, int>> & a, const std::pair<int,std::pair<std::string, int>> & b) -> bool {
+            return a.second.second > b.second.second;
+        });
     
     /*for(auto const &item : selected) {
            std::cout << item.first << ":    " << item.second.second << std::endl;
     }*/
-    std::cout << "\ntotal: " <<  total_counter << "\n\n";
-
+    
+    
     TPython::LoadMacro("raw2tree.py");
-    TPython::Exec(Form("main(%d, %s, %d)", selected.begin()->first, selected.begin()->second.first.c_str(), selected.begin()->second.second));
-
+    
+    int total_counter = 0;
+    for(auto const &item : selected) {
+        std::cout << item.first << ":    " << item.second.second << std::endl;
+        TPython::Exec(Form("main(%d, %s, %d)", item.first, item.second.first.c_str(), item.second.second));
+        gSystem->Exec(Form("mv tmp/online.raw.v1.%d.root e%d/", item.first, ebeam));
+        total_counter += item.second.second;
+        if (total_counter > 1000) break;
+    }
+    std::cout << "\n\ntotal count: "<< total_counter << "\n\n\n";
+    gSystem->Exec(Form("hadd e%d/raw.online.e%d.root e%d/*", ebeam, ebeam, ebeam)); 
+    gSystem->Exec(Form("mv scan2013_rho_tr_ph_fc_e%d_v8.txt e%d/", ebeam, ebeam) );
+    
     return 0;
 }
 
