@@ -15,6 +15,7 @@ using namespace TMath;
 
 int FIND_GG(int ebeam)
 {
+    gSystem->Exec("cd ~/lxe/online");
     gSystem->Exec(Form("mkdir e%d", ebeam));
     gSystem->Exec(Form("rm -f e%d/*",ebeam)); 
     
@@ -88,8 +89,12 @@ int FIND_GG(int ebeam)
     TPython::LoadMacro("raw2tree.py");
     
     int total_counter = 0;
+    int min_eventnum = -1;
+
     for(auto const &item : selected) {
         std::cout << item.first << ":    " << item.second.second << std::endl;
+        if (min_eventnum < 0 || min_eventnum > item.first) min_eventnum = item.first;
+
         TPython::Exec(Form("main(%d, %s, %d)", item.first, item.second.first.c_str(), item.second.second));
         gSystem->Exec(Form("mv tmp/online.raw.v1.%d.root e%d/", item.first, ebeam));
         total_counter += item.second.second;
@@ -97,8 +102,13 @@ int FIND_GG(int ebeam)
     }
     std::cout << "\n\ntotal count: "<< total_counter << "\n\n\n";
     gSystem->Exec(Form("hadd e%d/raw.online.e%d.root e%d/*", ebeam, ebeam, ebeam)); 
+    gSystem->Exec(Form("rm -f e%d/online.raw.v1.*", ebeam));
+
     gSystem->Exec(Form("mv scan2013_rho_tr_ph_fc_e%d_v8.txt e%d/", ebeam, ebeam) );
     
+    gSystem->Exec(Form("root -q -b \'~/lxe/convertor/doit.C( \"e%d/raw.online.e%d.root\" )\'", ebeam,  ebeam));
+    gSystem->Exec(Form("mv -v strips_run%d.root e%d/strips_run_e%d.root", min_eventnum, ebeam,  ebeam));
+    gSystem->Exec("cd ~/lxe/online");
     return 0;
 }
 
